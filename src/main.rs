@@ -9,79 +9,76 @@ struct Server {
 }
 
 trait State {
-    fn appendEntries(&self);
-    fn requestVote(
+    fn append_entries(&self) -> Result<Box<dyn State>, &str>;
+    fn request_vote(
         &mut self,
         term: i32,
         candidateId: Uuid,
         lastLogIndex: i32,
         lastLogTerm: i32,
-    ) -> Result<(), String>;
-    fn getTerm(&self) -> i32;
+    ) -> Result<Box<dyn State>, &str>;
 }
 
 struct Leader {
     term: i32,
 }
+
 struct Follower {
     term: i32,
 }
+
 struct Candidate {
     term: i32,
 }
 
 impl State for Leader {
-    fn appendEntries(&self) {
+    fn append_entries(&self) -> Result<Box<dyn State>, &str> {
         // if given term is greater, become a follower
+        Err("Not implemented")
     }
-    fn requestVote(
+    fn request_vote(
         &mut self,
         term: i32,
         candidateId: Uuid,
         lastLogIndex: i32,
         lastLogTerm: i32,
-    ) -> Result<(), String> {
-        Ok(())
-    }
-    fn getTerm(&self) -> i32 {
-        self.term
+    ) -> Result<Box<dyn State>, &str> {
+        Err("Not implemented")
     }
 }
 
 impl State for Follower {
-    fn appendEntries(&self) {}
-    fn requestVote(
+    fn append_entries(&self) -> Result<Box<dyn State>, &str> {
+        Err("Not implemented")
+    }
+    fn request_vote(
         &mut self,
         term: i32,
         candidateId: Uuid,
         lastLogIndex: i32,
         lastLogTerm: i32,
-    ) -> Result<(), String> {
+    ) -> Result<Box<dyn State>, &str> {
         if self.term >= term {
             println!("Rejecting vote from {}", candidateId);
-            return Err("error".to_owned());
+            return Err("Not implemented");
         }
         self.term = term;
-        Ok(())
-    }
-    fn getTerm(&self) -> i32 {
-        self.term
+        Err("Not implemented")
     }
 }
 
 impl State for Candidate {
-    fn appendEntries(&self) {}
-    fn requestVote(
+    fn append_entries(&self) -> Result<Box<dyn State>, &str> {
+        Err("Not implemented")
+    }
+    fn request_vote(
         &mut self,
         term: i32,
         candidateId: Uuid,
         lastLogIndex: i32,
         lastLogTerm: i32,
-    ) -> Result<(), String> {
-        Ok(())
-    }
-    fn getTerm(&self) -> i32 {
-        self.term
+    ) -> Result<Box<dyn State>, &str> {
+        Err("Not implemented")
     }
 }
 
@@ -106,9 +103,7 @@ impl Server {
     }
 
     pub fn elect_leader(&mut self) {
-        self.state = Box::new(Candidate {
-            term: self.state.getTerm() + 1,
-        });
+        self.state = Box::new(Candidate { term: 1 });
         // call RPC
     }
 
@@ -121,5 +116,4 @@ impl Server {
 fn main() {
     let servers = Server::create_servers(3);
     servers.iter().for_each(|server| server.borrow().start());
-    println!("Hello, world!");
 }
