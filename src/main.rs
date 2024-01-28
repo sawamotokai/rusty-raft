@@ -19,16 +19,33 @@ trait State {
     ) -> Result<Box<dyn State>, String>;
 }
 
+struct Command {
+    index: i32,
+    content: String,
+}
+
+struct CommonState {
+    // persited states
+    current_term: i32,
+    voted_for: Option<Uuid>,
+    log: Vec<Command>,
+    commit_index: i32, // (volatile) highest log entry known to be commited
+    last_applied: i32, // (volatile) highest log entry applied on the server
+}
+
 struct Leader {
-    term: i32,
+    common_state: CommonState,
+    next_index: Vec<i32>, // (volatile) for each peer, index where leaeder needs to start sending logs from on
+    match_index: Vec<i32>, // (volatile) for each peer, highest entry leader knows was
+                          // replicated?
 }
 
 struct Follower {
-    term: i32,
+    common_state: CommonState,
 }
 
 struct Candidate {
-    term: i32,
+    common_state: CommonState,
 }
 
 impl State for Leader {
@@ -58,11 +75,11 @@ impl State for Follower {
         last_log_index: i32,
         last_log_term: i32,
     ) -> Result<Box<dyn State>, String> {
-        if self.term >= term {
+        if self.current_term >= term {
             println!("Rejecting vote from {}", candidate_id);
             return Err("Not implemented".to_string());
         }
-        self.term = term;
+        self.current_term = term;
         Err("Not implemented".to_string())
     }
 }
@@ -97,7 +114,7 @@ impl Server {
     pub fn new() -> Self {
         Server {
             id: Uuid::new_v4(),
-            state: Box::new(Follower { term: 0 }),
+            state: Box::new(Follower { current_term: 0 }),
             peers: vec![],
         }
     }
