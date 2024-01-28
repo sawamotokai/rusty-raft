@@ -9,14 +9,14 @@ struct Server {
 }
 
 trait State {
-    fn append_entries(&self) -> Result<Box<dyn State>, &str>;
+    fn append_entries(&mut self) -> Result<Box<dyn State>, String>;
     fn request_vote(
         &mut self,
         term: i32,
-        candidateId: Uuid,
-        lastLogIndex: i32,
-        lastLogTerm: i32,
-    ) -> Result<Box<dyn State>, &str>;
+        candidate_id: Uuid,
+        last_log_index: i32,
+        last_log_term: i32,
+    ) -> Result<Box<dyn State>, String>;
 }
 
 struct Leader {
@@ -32,53 +32,53 @@ struct Candidate {
 }
 
 impl State for Leader {
-    fn append_entries(&self) -> Result<Box<dyn State>, &str> {
+    fn append_entries(&mut self) -> Result<Box<dyn State>, String> {
         // if given term is greater, become a follower
-        Err("Not implemented")
+        Err("Not implemented".to_string())
     }
     fn request_vote(
         &mut self,
         term: i32,
-        candidateId: Uuid,
-        lastLogIndex: i32,
-        lastLogTerm: i32,
-    ) -> Result<Box<dyn State>, &str> {
-        Err("Not implemented")
+        candidate_id: Uuid,
+        last_log_index: i32,
+        last_log_term: i32,
+    ) -> Result<Box<dyn State>, String> {
+        Err("Not implemented".to_string())
     }
 }
 
 impl State for Follower {
-    fn append_entries(&self) -> Result<Box<dyn State>, &str> {
-        Err("Not implemented")
+    fn append_entries(&mut self) -> Result<Box<dyn State>, String> {
+        Err("Not implemented".to_string())
     }
     fn request_vote(
         &mut self,
         term: i32,
-        candidateId: Uuid,
-        lastLogIndex: i32,
-        lastLogTerm: i32,
-    ) -> Result<Box<dyn State>, &str> {
+        candidate_id: Uuid,
+        last_log_index: i32,
+        last_log_term: i32,
+    ) -> Result<Box<dyn State>, String> {
         if self.term >= term {
-            println!("Rejecting vote from {}", candidateId);
-            return Err("Not implemented");
+            println!("Rejecting vote from {}", candidate_id);
+            return Err("Not implemented".to_string());
         }
         self.term = term;
-        Err("Not implemented")
+        Err("Not implemented".to_string())
     }
 }
 
 impl State for Candidate {
-    fn append_entries(&self) -> Result<Box<dyn State>, &str> {
-        Err("Not implemented")
+    fn append_entries(&mut self) -> Result<Box<dyn State>, String> {
+        Err("Not implemented".to_string())
     }
     fn request_vote(
         &mut self,
         term: i32,
-        candidateId: Uuid,
-        lastLogIndex: i32,
-        lastLogTerm: i32,
-    ) -> Result<Box<dyn State>, &str> {
-        Err("Not implemented")
+        candidate_id: Uuid,
+        last_log_index: i32,
+        last_log_term: i32,
+    ) -> Result<Box<dyn State>, String> {
+        Err("Not implemented".to_string())
     }
 }
 
@@ -102,14 +102,34 @@ impl Server {
         }
     }
 
-    pub fn elect_leader(&mut self) {
-        self.state = Box::new(Candidate { term: 1 });
-        // call RPC
-    }
-
     pub fn start(&self) {
         println!("Server {} started...", self.id);
         // start thread to check heartbeats
+    }
+
+    fn update_state(&mut self, result: Result<Box<dyn State>, String>) {
+        match result {
+            Ok(new_state) => self.state = new_state,
+            Err(err) => println!("{}", err),
+        }
+    }
+
+    pub fn append_entries(&mut self) {
+        let result: Result<Box<dyn State>, String> = self.state.append_entries();
+        self.update_state(result);
+    }
+
+    pub fn request_vote(
+        &mut self,
+        term: i32,
+        candidate_id: Uuid,
+        last_log_index: i32,
+        last_log_term: i32,
+    ) {
+        let result: Result<Box<dyn State>, String> =
+            self.state
+                .request_vote(term, candidate_id, last_log_index, last_log_term);
+        self.update_state(result);
     }
 }
 
