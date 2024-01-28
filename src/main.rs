@@ -1,11 +1,20 @@
-use std::{any::TypeId, cell::RefCell, rc::Rc, vec};
-
+use rand::Rng;
+use std::{
+    alloc::System,
+    cell::RefCell,
+    rc::Rc,
+    thread::sleep,
+    time::{Duration, SystemTime},
+    vec,
+};
 use uuid::Uuid;
 
 struct Server {
     id: Uuid,
     mode: Box<dyn ServerMode>,
     peers: Vec<Rc<RefCell<Server>>>,
+    election_timeout_mills: Duration,
+    last_heartbeat: Option<SystemTime>,
 }
 
 trait ServerMode {
@@ -30,7 +39,11 @@ trait ServerMode {
     fn set_term(&mut self, term: usize);
     fn set_voted_for(&mut self, server_voted_for: Uuid);
     fn begin_election(&self) -> Result<Box<dyn ServerMode>, String>;
-    fn check_heatbeat(&self) -> Result<Box<dyn ServerMode>, String>;
+    fn check_heartbeat(
+        &self,
+        heatbeat: Option<SystemTime>,
+        election_timeout: Duration,
+    ) -> Result<Box<dyn ServerMode>, String>;
 }
 
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone)]
@@ -114,11 +127,17 @@ impl ServerMode for LeaderMode {
     fn set_voted_for(&mut self, server_voted_for: Uuid) {
         self.common_state.voted_for = Some(server_voted_for);
     }
+
     fn begin_election(&self) -> Result<Box<dyn ServerMode>, String> {
         Err("Not implemented".to_string())
     }
-    fn check_heatbeat(&self) -> Result<Box<dyn ServerMode>, String> {
-        Err("Not implemented".to_string())
+
+    fn check_heartbeat(
+        &self,
+        _last_heartbeat: Option<SystemTime>,
+        _timeout_mills: Duration,
+    ) -> Result<Box<dyn ServerMode>, String> {
+        Ok(Box::new(self.clone()))
     }
 }
 
@@ -191,23 +210,42 @@ impl ServerMode for FollowerMode {
         new_state.set_term(term);
         Ok(new_state)
     }
+
     fn get_term(&self) -> usize {
         self.common_state.current_term
     }
+
     fn get_voted_for(&self) -> Option<Uuid> {
         self.common_state.voted_for
     }
+
     fn set_term(&mut self, term: usize) {
         self.common_state.current_term = term;
     }
+
     fn set_voted_for(&mut self, server_voted_for: Uuid) {
         self.common_state.voted_for = Some(server_voted_for);
     }
+
     fn begin_election(&self) -> Result<Box<dyn ServerMode>, String> {
         Err("Not implemented".to_string())
     }
-    fn check_heatbeat(&self) -> Result<Box<dyn ServerMode>, String> {
-        Err("Not implemented".to_string())
+
+    fn check_heartbeat(
+        &self,
+        last_heartbeat: Option<SystemTime>,
+        election_timeout: Duration,
+    ) -> Result<Box<dyn ServerMode>, String> {
+        match last_heartbeat {
+            None => self.begin_election(),
+            Some(heartbeat) => {
+                if SystemTime::now().duration_since(heartbeat).unwrap() > election_timeout {
+                    self.begin_election()
+                } else {
+                    Ok(Box::new(self.clone()) as Box<dyn ServerMode>)
+                }
+            }
+        }
     }
 }
 
@@ -259,7 +297,11 @@ impl ServerMode for CandidateMode {
     fn begin_election(&self) -> Result<Box<dyn ServerMode>, String> {
         Err("Not implemented".to_string())
     }
-    fn check_heatbeat(&self) -> Result<Box<dyn ServerMode>, String> {
+    fn check_heartbeat(
+        &self,
+        heartbeat: Option<SystemTime>,
+        election_timeout: Duration,
+    ) -> Result<Box<dyn ServerMode>, String> {
         Err("Not implemented".to_string())
     }
 }
@@ -281,12 +323,18 @@ impl Server {
             id: Uuid::new_v4(),
             mode: Box::new(FollowerMode::new()),
             peers: vec![],
+            last_heartbeat: None,
+            election_timeout_mills: Duration::from_millis(rand::thread_rng().gen_range(150..=300)),
         }
     }
 
-    pub fn start(&self) {
+    pub fn start(&mut self) {
         println!("Server {} started...", self.id);
         // start thread to check heartbeats
+        loop {
+            sleep(self.election_timeout_mills);
+            self.check_heatbeat();
+        }
     }
 
     fn update_state(&mut self, result: Result<Box<dyn ServerMode>, String>) {
@@ -305,15 +353,14 @@ impl Server {
         entries: Box<Vec<Command>>,
         leader_commit: usize, // leader's commit index
     ) {
-        let result: Result<Box<dyn ServerMode>, String> = self.mode.append_entries_rpc(
+        self.update_state(self.mode.append_entries_rpc(
             leader_term,
             leader_id,
             prev_log_index,
             prev_log_term,
             entries,
             leader_commit,
-        );
-        self.update_state(result);
+        ));
     }
 
     pub fn request_vote_rpc(
@@ -323,17 +370,29 @@ impl Server {
         last_log_index: usize,
         last_log_term: usize,
     ) {
-        let result: Result<Box<dyn ServerMode>, String> =
-            self.mode
-                .request_vote_rpc(term, candidate_id, last_log_index, last_log_term);
-        self.update_state(result);
+        self.update_state(self.mode.request_vote_rpc(
+            term,
+            candidate_id,
+            last_log_index,
+            last_log_term,
+        ));
     }
 
-    fn begin_election(&mut self) {}
-    fn check_heatbeat(&mut self) {}
+    fn begin_election(&mut self) {
+        self.update_state(self.mode.begin_election());
+    }
+
+    fn check_heatbeat(&mut self) {
+        self.update_state(
+            self.mode
+                .check_heartbeat(self.last_heartbeat, self.election_timeout_mills),
+        );
+    }
 }
 
 fn main() {
     let servers = Server::create_servers(3);
-    servers.iter().for_each(|server| server.borrow().start());
+    servers
+        .iter()
+        .for_each(|server| server.borrow_mut().start());
 }
