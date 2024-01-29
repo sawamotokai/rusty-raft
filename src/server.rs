@@ -45,9 +45,9 @@ impl Server {
         println!("Server {} started...", self.id);
         // start thread to check heartbeats
         loop {
+            sleep(self.election_timeout_mills);
             self.check_heatbeat();
             yield_now();
-            sleep(self.election_timeout_mills);
         }
     }
 
