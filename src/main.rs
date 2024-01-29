@@ -3,7 +3,7 @@ mod server;
 mod states;
 
 use server::Server;
-use std::{sync::Arc, thread};
+use std::{env, sync::Arc, thread};
 
 fn main() {
     let servers = Server::create_servers(3);
