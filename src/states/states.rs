@@ -1,7 +1,7 @@
 use super::super::command::Command;
 use std::{
-    cell::RefCell,
-    rc::Rc,
+    sync::Arc,
+    sync::Mutex,
     time::{Duration, SystemTime},
 };
 use uuid::Uuid;
@@ -11,12 +11,12 @@ pub struct CommonState {
     // persited states
     pub current_term: usize,
     pub voted_for: Option<Uuid>,
-    pub log: Rc<RefCell<Vec<Command>>>,
+    pub log: Arc<Mutex<Vec<Command>>>,
     pub commit_index: i32, // (volatile) highest log entry known to be commited
     pub last_applied: i32, // (volatile) highest log entry applied on the server
 }
 
-pub trait ServerMode {
+pub trait ServerMode: Send + Sync {
     fn append_entries_rpc(
         &self,
         leader_term: usize,

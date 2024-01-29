@@ -2,6 +2,7 @@ use super::super::command::Command;
 use super::states::{CommonState, ServerMode};
 use std::time::{Duration, SystemTime};
 use uuid::Uuid;
+
 #[derive(Debug, Default, Clone)]
 pub struct FollowerMode {
     pub common_state: CommonState,
@@ -33,28 +34,29 @@ impl ServerMode for FollowerMode {
         if leader_term < self.get_term() {
             return Err("leader is behind".to_string());
         }
-        if prev_log_index as usize >= self.common_state.log.borrow().len()
-            || prev_log_term != self.common_state.log.borrow()[prev_log_index].term
+        if prev_log_index as usize >= self.common_state.log.lock().unwrap().len()
+            || prev_log_term != self.common_state.log.lock().unwrap()[prev_log_index].term
         {
             return Err("prev entry doesn't match".to_string());
         }
         let first_index = prev_log_index + 1;
         for (i, entry) in entries.iter().enumerate() {
             let index = i + first_index;
-            if self.common_state.log.borrow().len() <= index {
+            if self.common_state.log.lock().unwrap().len() <= index {
                 new_state
                     .common_state
                     .log
-                    .borrow_mut()
+                    .lock()
+                    .unwrap()
                     .push(entry.to_owned());
-            } else if self.common_state.log.borrow()[index].term != entry.term {
-                new_state.common_state.log.borrow_mut()[index] = entry.to_owned();
+            } else if self.common_state.log.lock().unwrap()[index].term != entry.term {
+                new_state.common_state.log.lock().unwrap()[index] = entry.to_owned();
             } else {
                 println!("Checking commands identity");
-                assert_eq!(self.common_state.log.borrow()[index], *entry);
+                assert_eq!(self.common_state.log.lock().unwrap()[index], *entry);
             }
         }
-        let last_index = self.common_state.log.borrow().len() - 1;
+        let last_index = self.common_state.log.lock().unwrap().len() - 1;
         if leader_commit > self.common_state.commit_index as usize {
             new_state.common_state.commit_index = std::cmp::min(leader_commit, last_index) as i32;
         }
@@ -94,6 +96,7 @@ impl ServerMode for FollowerMode {
     }
 
     fn begin_election(&self) -> Result<Box<dyn ServerMode>, String> {
+        println!("[Follower] begin_election");
         Err("Not implemented".to_string())
     }
 
@@ -102,6 +105,7 @@ impl ServerMode for FollowerMode {
         last_heartbeat: Option<SystemTime>,
         election_timeout: Duration,
     ) -> Result<Box<dyn ServerMode>, String> {
+        println!("[Follower] check_heartbeat");
         match last_heartbeat {
             None => self.begin_election(),
             Some(heartbeat) => {

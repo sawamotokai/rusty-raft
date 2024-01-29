@@ -3,9 +3,9 @@ use crate::states::follower::FollowerMode;
 use crate::states::states::ServerMode;
 use rand::Rng;
 use std::{
-    cell::RefCell,
-    rc::Rc,
-    thread::sleep,
+    sync::Arc,
+    sync::Mutex,
+    thread::{sleep, yield_now},
     time::{Duration, SystemTime},
     vec,
 };
@@ -14,20 +14,20 @@ use uuid::Uuid;
 pub struct Server {
     id: Uuid,
     mode: Box<dyn ServerMode>,
-    peers: Vec<Rc<RefCell<Server>>>,
+    peers: Vec<Arc<Mutex<Server>>>,
     election_timeout_mills: Duration,
     last_heartbeat: Option<SystemTime>,
 }
 
 impl Server {
-    pub fn create_servers(num: usize) -> Vec<Rc<RefCell<Server>>> {
-        let mut servers: Vec<Rc<RefCell<Server>>> = (0..num)
-            .map(|_| Rc::new(RefCell::new(Server::new())))
+    pub fn create_servers(num: usize) -> Vec<Arc<Mutex<Server>>> {
+        let mut servers: Vec<Arc<Mutex<Server>>> = (0..num)
+            .map(|_| Arc::new(Mutex::new(Server::new())))
             .collect();
         let cloned = servers.clone();
         servers
             .iter_mut()
-            .for_each(|s| s.borrow_mut().peers = cloned.clone());
+            .for_each(|s| s.lock().unwrap().peers = cloned.clone());
         return servers;
     }
 
@@ -45,8 +45,9 @@ impl Server {
         println!("Server {} started...", self.id);
         // start thread to check heartbeats
         loop {
-            sleep(self.election_timeout_mills);
             self.check_heatbeat();
+            yield_now();
+            sleep(self.election_timeout_mills);
         }
     }
 
@@ -89,6 +90,7 @@ impl Server {
     }
 
     pub fn check_heatbeat(&mut self) {
+        println!("[{}] Checking heartbeat", self.id);
         self.update_state(
             self.mode
                 .check_heartbeat(self.last_heartbeat, self.election_timeout_mills),
