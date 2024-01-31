@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package raft;
+
+service RPCServer {
+  rpc SayHello (HelloRequest) returns (HelloReply) {}
+  rpc AppendEntries (AppendEntriesReq) returns (AppendEntriesRes) {}
+  rpc RequestVote (RequestVoteReq) returns (RequestVoteRes) {}
+}
+
+message HelloRequest {
+  string name = 1;
+}
+
+message HelloReply {
+  string message = 1;
+}
+
+message AppendEntriesReq {
+  message Command {
+    int32 index = 1;
+    int32 term = 2;
+    string content = 3;
+  }
+  int32 leader_term = 1;
+  string leader_id = 2;
+  int32 prev_log_index = 3;
+  int32 prev_log_term = 4;
+  repeated Command entries = 5;
+  int32 leader_commit = 6;
+}
+
+message AppendEntriesRes {
+  bool success = 1;
+  int32 term = 2;
+}
+
+message RequestVoteReq {
+  message Command {
+    int32 index = 1;
+    int32 term = 2;
+    string content = 3;
+  }
+  int32 leader_term = 1;
+  string leader_id = 2;
+  int32 prev_log_index = 3;
+  int32 prev_log_term = 4;
+  repeated Command entries = 5;
+  int32 leader_commit = 6;
+}
+
+message RequestVoteRes {
+  bool success = 1;
+  int32 term = 2;
+}
