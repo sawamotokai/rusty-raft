@@ -1,19 +1,19 @@
 syntax = "proto3";
-package rpcserver;
+package raft;
 
 service Raft {
-  rpc SayHello (HelloRequest) returns (HelloReply);
+  // rpc SayHello (HelloRequest) returns (HelloReply);
   rpc AppendEntries (AppendEntriesReq) returns (AppendEntriesRes);
   rpc RequestVote (RequestVoteReq) returns (RequestVoteRes);
 }
 
-message HelloRequest {
-  string name = 1;
-}
-
-message HelloReply {
-  string message = 1;
-}
+// message HelloRequest {
+//   string name = 1;
+// }
+//
+// message HelloReply {
+//   string message = 1;
+// }
 
 message AppendEntriesReq {
   message Command {

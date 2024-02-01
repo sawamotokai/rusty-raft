@@ -1,6 +1,9 @@
-use crate::command::Command;
 use crate::states::follower::FollowerMode;
 use crate::states::states::ServerMode;
+use raft::raft_server::{Raft, RaftServer};
+use raft::{
+    request_vote_req::Command, AppendEntriesReq, AppendEntriesRes, RequestVoteReq, RequestVoteRes,
+};
 use rand::Rng;
 use std::{
     sync::Arc,
@@ -9,14 +12,15 @@ use std::{
     time::{Duration, SystemTime},
     vec,
 };
+use tonic::{transport, Request, Response, Status};
 use uuid::Uuid;
 
 pub mod command;
-pub mod server;
 pub mod states;
 
-tonic::include_proto!("rpcserver"); // The string specified here must match the proto package name
-                                    //
+pub mod raft {
+    tonic::include_proto!("raft"); // The string specified here must match the proto package name
+}
 
 pub struct Server {
     id: Uuid,
@@ -24,6 +28,32 @@ pub struct Server {
     peers: Vec<Arc<Mutex<Server>>>,
     election_timeout_mills: Duration,
     last_heartbeat: Option<SystemTime>,
+}
+
+#[tonic::async_trait]
+impl Raft for Server {
+    async fn request_vote(
+        &self,
+        req: Request<RequestVoteReq>,
+    ) -> Result<Response<RequestVoteRes>, Status> {
+        println!("[Req] {:?}", req);
+        let res = RequestVoteRes {
+            success: true,
+            term: 0,
+        };
+        Ok(Response::new(res))
+    }
+    async fn append_entries(
+        &self,
+        req: Request<AppendEntriesReq>,
+    ) -> Result<Response<AppendEntriesRes>, Status> {
+        println!("[Req] {:?}", req);
+        let res = AppendEntriesRes {
+            success: true,
+            term: 0,
+        };
+        Ok(Response::new(res))
+    }
 }
 
 impl Server {
@@ -47,39 +77,39 @@ impl Server {
         }
     }
 
-    pub fn append_entries_rpc(
-        &mut self,
-        leader_term: usize,
-        leader_id: Uuid,
-        prev_log_index: usize, // idnex of immediately preceeding entry
-        prev_log_term: usize,  // term of immediately preceeding entry
-        entries: Box<Vec<Command>>,
-        leader_commit: usize, // leader's commit index
-    ) {
-        self.update_state(self.mode.append_entries_rpc(
-            leader_term,
-            leader_id,
-            prev_log_index,
-            prev_log_term,
-            entries,
-            leader_commit,
-        ));
-    }
-
-    pub fn request_vote_rpc(
-        &mut self,
-        term: usize,
-        candidate_id: Uuid,
-        last_log_index: usize,
-        last_log_term: usize,
-    ) {
-        self.update_state(self.mode.request_vote_rpc(
-            term,
-            candidate_id,
-            last_log_index,
-            last_log_term,
-        ));
-    }
+    // pub fn append_entries_rpc(
+    //     &mut self,
+    //     leader_term: usize,
+    //     leader_id: Uuid,
+    //     prev_log_index: usize, // idnex of immediately preceeding entry
+    //     prev_log_term: usize,  // term of immediately preceeding entry
+    //     entries: Box<Vec<Command>>,
+    //     leader_commit: usize, // leader's commit index
+    // ) {
+    //     self.update_state(self.mode.append_entries_rpc(
+    //         leader_term,
+    //         leader_id,
+    //         prev_log_index,
+    //         prev_log_term,
+    //         entries,
+    //         leader_commit,
+    //     ));
+    // }
+    //
+    // pub fn request_vote_rpc(
+    //     &mut self,
+    //     term: usize,
+    //     candidate_id: Uuid,
+    //     last_log_index: usize,
+    //     last_log_term: usize,
+    // ) {
+    //     self.update_state(self.mode.request_vote_rpc(
+    //         term,
+    //         candidate_id,
+    //         last_log_index,
+    //         last_log_term,
+    //     ));
+    // }
 
     pub fn begin_election(&mut self) {
         self.update_state(self.mode.begin_election());
