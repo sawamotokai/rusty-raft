@@ -1,11 +1,10 @@
 syntax = "proto3";
+package rpcserver;
 
-package raft;
-
-service RPCServer {
-  rpc SayHello (HelloRequest) returns (HelloReply) {}
-  rpc AppendEntries (AppendEntriesReq) returns (AppendEntriesRes) {}
-  rpc RequestVote (RequestVoteReq) returns (RequestVoteRes) {}
+service Raft {
+  rpc SayHello (HelloRequest) returns (HelloReply);
+  rpc AppendEntries (AppendEntriesReq) returns (AppendEntriesRes);
+  rpc RequestVote (RequestVoteReq) returns (RequestVoteRes);
 }
 
 message HelloRequest {

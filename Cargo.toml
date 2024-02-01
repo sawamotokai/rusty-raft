@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 prost = "0.12.3"
 rand = "0.8"
+tokio = "1.35.1"
 tonic = "0.10.2"
 
 [dependencies.uuid]
@@ -18,8 +19,9 @@ features = [
     ]
     
 [[bin]]
-name = "raft"
-path = "src/main.rs"
+name = "raft-server"
+path = "src/server.rs"
 
 [build-dependencies]
 tonic-build = "0.10.2"
+

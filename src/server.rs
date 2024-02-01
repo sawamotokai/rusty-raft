@@ -11,6 +11,13 @@ use std::{
 };
 use uuid::Uuid;
 
+pub mod command;
+pub mod server;
+pub mod states;
+
+tonic::include_proto!("rpcserver"); // The string specified here must match the proto package name
+                                    //
+
 pub struct Server {
     id: Uuid,
     mode: Box<dyn ServerMode>,
@@ -20,17 +27,6 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn create_servers(num: usize) -> Vec<Arc<Mutex<Server>>> {
-        let mut servers: Vec<Arc<Mutex<Server>>> = (0..num)
-            .map(|_| Arc::new(Mutex::new(Server::new())))
-            .collect();
-        let cloned = servers.clone();
-        servers
-            .iter_mut()
-            .for_each(|s| s.lock().unwrap().peers = cloned.clone());
-        return servers;
-    }
-
     pub fn new() -> Self {
         Server {
             id: Uuid::new_v4(),
@@ -103,4 +99,8 @@ impl Server {
             Err(err) => println!("{}", err),
         }
     }
+}
+
+fn main() {
+    println!("Main function");
 }
