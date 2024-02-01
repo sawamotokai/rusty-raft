@@ -1,9 +1,6 @@
-use crate::states::follower::FollowerMode;
-use crate::states::states::ServerMode;
+use crate::states::{follower::FollowerMode, states::ServerMode};
 use raft::raft_server::{Raft, RaftServer};
-use raft::{
-    request_vote_req::Command, AppendEntriesReq, AppendEntriesRes, RequestVoteReq, RequestVoteRes,
-};
+use raft::{AppendEntriesReq, AppendEntriesRes, RequestVoteReq, RequestVoteRes};
 use rand::Rng;
 use std::{
     sync::Arc,
@@ -131,6 +128,13 @@ impl Server {
     }
 }
 
-fn main() {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Main function");
+    let addr = "[::1]:50051".parse()?;
+    transport::Server::builder()
+        .add_service(RaftServer::new(Server::new()))
+        .serve(addr)
+        .await?;
+    Ok(())
 }
