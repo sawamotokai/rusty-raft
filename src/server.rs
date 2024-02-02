@@ -12,7 +12,6 @@ use std::{
 use tonic::{transport, Request, Response, Status};
 use uuid::Uuid;
 
-pub mod command;
 pub mod states;
 
 pub mod raft {
@@ -21,7 +20,7 @@ pub mod raft {
 
 pub struct Server {
     id: Uuid,
-    mode: Box<dyn ServerMode>,
+    mode: Mutex<Box<dyn ServerMode>>,
     peers: Vec<Arc<Mutex<Server>>>,
     election_timeout_mills: Duration,
     last_heartbeat: Option<SystemTime>,
@@ -34,6 +33,12 @@ impl Raft for Server {
         req: Request<RequestVoteReq>,
     ) -> Result<Response<RequestVoteRes>, Status> {
         println!("[Req] {:?}", req);
+        self.update_state(self.mode.lock().unwrap().request_vote_rpc(
+            req.get_ref().leader_term as usize,
+            Uuid::parse_str(&req.get_ref().leader_id).unwrap(),
+            req.get_ref().prev_log_index as usize,
+            req.get_ref().prev_log_term as usize,
+        ));
         let res = RequestVoteRes {
             success: true,
             term: 0,
@@ -49,6 +54,14 @@ impl Raft for Server {
             success: true,
             term: 0,
         };
+        self.update_state(self.mode.lock().unwrap().append_entries_rpc(
+            req.get_ref().leader_term as usize,
+            Uuid::parse_str(&req.get_ref().leader_id).unwrap(),
+            req.get_ref().prev_log_index as usize,
+            req.get_ref().prev_log_term as usize,
+            Box::new(req.get_ref().entries.clone()),
+            req.get_ref().leader_commit as usize,
+        ));
         Ok(Response::new(res))
     }
 }
@@ -57,7 +70,7 @@ impl Server {
     pub fn new() -> Self {
         Server {
             id: Uuid::new_v4(),
-            mode: Box::new(FollowerMode::new()),
+            mode: Mutex::new(Box::new(FollowerMode::new())),
             peers: vec![],
             last_heartbeat: None,
             election_timeout_mills: Duration::from_millis(rand::thread_rng().gen_range(150..=300)),
@@ -74,55 +87,23 @@ impl Server {
         }
     }
 
-    // pub fn append_entries_rpc(
-    //     &mut self,
-    //     leader_term: usize,
-    //     leader_id: Uuid,
-    //     prev_log_index: usize, // idnex of immediately preceeding entry
-    //     prev_log_term: usize,  // term of immediately preceeding entry
-    //     entries: Box<Vec<Command>>,
-    //     leader_commit: usize, // leader's commit index
-    // ) {
-    //     self.update_state(self.mode.append_entries_rpc(
-    //         leader_term,
-    //         leader_id,
-    //         prev_log_index,
-    //         prev_log_term,
-    //         entries,
-    //         leader_commit,
-    //     ));
-    // }
-    //
-    // pub fn request_vote_rpc(
-    //     &mut self,
-    //     term: usize,
-    //     candidate_id: Uuid,
-    //     last_log_index: usize,
-    //     last_log_term: usize,
-    // ) {
-    //     self.update_state(self.mode.request_vote_rpc(
-    //         term,
-    //         candidate_id,
-    //         last_log_index,
-    //         last_log_term,
-    //     ));
-    // }
-
     pub fn begin_election(&mut self) {
-        self.update_state(self.mode.begin_election());
+        self.update_state(self.mode.lock().unwrap().begin_election());
     }
 
     pub fn check_heatbeat(&mut self) {
         println!("[{}] Checking heartbeat", self.id);
         self.update_state(
             self.mode
+                .lock()
+                .unwrap()
                 .check_heartbeat(self.last_heartbeat, self.election_timeout_mills),
         );
     }
 
-    fn update_state(&mut self, result: Result<Box<dyn ServerMode>, String>) {
+    fn update_state(&self, result: Result<Box<dyn ServerMode>, String>) {
         match result {
-            Ok(new_state) => self.mode = new_state,
+            Ok(new_state) => *self.mode.lock().unwrap() = new_state,
             Err(err) => println!("{}", err),
         }
     }

@@ -1,5 +1,5 @@
-use super::super::command::Command;
 use super::states::{CommonState, ServerMode};
+use crate::raft::append_entries_req::Command;
 use std::time::{Duration, SystemTime};
 use uuid::Uuid;
 
@@ -35,7 +35,7 @@ impl ServerMode for FollowerMode {
             return Err("leader is behind".to_string());
         }
         if prev_log_index as usize >= self.common_state.log.lock().unwrap().len()
-            || prev_log_term != self.common_state.log.lock().unwrap()[prev_log_index].term
+            || prev_log_term != self.common_state.log.lock().unwrap()[prev_log_index].term as usize
         {
             return Err("prev entry doesn't match".to_string());
         }

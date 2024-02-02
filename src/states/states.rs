@@ -1,4 +1,4 @@
-use super::super::command::Command;
+use crate::raft::append_entries_req::Command;
 use std::{
     sync::Arc,
     sync::Mutex,

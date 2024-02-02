@@ -1,6 +1,6 @@
-use super::super::command::Command;
 use super::follower::FollowerMode;
 use super::states::{CommonState, ServerMode};
+use crate::raft::append_entries_req::Command;
 use std::time::{Duration, SystemTime};
 use uuid::Uuid;
 #[derive(Debug, Default, Clone)]
