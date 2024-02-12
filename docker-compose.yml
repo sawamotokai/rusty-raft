@@ -1,0 +1,25 @@
+version: '3.8'
+services:
+  server1:
+    build: .
+    ports:
+      - "50051:50051"
+    environment:
+      - SELF_ENDPOINT=127.0.0.1:50051
+      - PEER_ENDPOINTS=127.0.0.1:50052,127.0.0.1:50053
+
+  server2:
+    build: .
+    ports:
+      - "50052:50051"
+    environment:
+      - SELF_ENDPOINT=127.0.0.1:50052
+      - PEER_ENDPOINTS=127.0.0.1:50051,127.0.0.1:50053
+
+  server3:
+    build: .
+    ports:
+      - "50053:50051"
+    environment:
+      - SELF_ENDPOINT=127.0.0.1:50053
+      - PEER_ENDPOINTS=127.0.0.1:50051,127.0.0.1:50052
