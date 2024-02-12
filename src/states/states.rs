@@ -1,9 +1,11 @@
-use crate::raft::append_entries_req::Command;
+use crate::raft::{append_entries_req::Command, raft_client::RaftClient};
+use futures::executor::block_on;
 use std::{
     sync::Arc,
     sync::Mutex,
     time::{Duration, SystemTime},
 };
+use tonic::transport::Channel;
 use uuid::Uuid;
 
 #[derive(Debug, Default, Clone)]
@@ -43,4 +45,13 @@ pub trait ServerMode: Send + Sync {
         heatbeat: Option<SystemTime>,
         election_timeout: Duration,
     ) -> Result<Box<dyn ServerMode>, String>;
+
+    fn create_client(
+        &self,
+        endpoint: String,
+    ) -> Result<RaftClient<Channel>, Box<dyn std::error::Error>> {
+        let connect = RaftClient::connect(endpoint);
+        let client = block_on(connect)?;
+        Ok(client)
+    }
 }

@@ -2,12 +2,11 @@ use crate::states::{follower::FollowerMode, states::ServerMode};
 use raft::raft_server::{Raft, RaftServer};
 use raft::{AppendEntriesReq, AppendEntriesRes, RequestVoteReq, RequestVoteRes};
 use rand::Rng;
+use std::env;
+use std::net::SocketAddr;
 use std::{
-    sync::Arc,
     sync::Mutex,
-    thread::{sleep, yield_now},
     time::{Duration, SystemTime},
-    vec,
 };
 use tonic::{transport, Request, Response, Status};
 use uuid::Uuid;
@@ -21,7 +20,7 @@ pub mod raft {
 pub struct Server {
     id: Uuid,
     mode: Mutex<Box<dyn ServerMode>>,
-    peers: Vec<Arc<Mutex<Server>>>,
+    peers: Vec<SocketAddr>,
     election_timeout_mills: Duration,
     last_heartbeat: Option<SystemTime>,
 }
@@ -67,23 +66,13 @@ impl Raft for Server {
 }
 
 impl Server {
-    pub fn new() -> Self {
+    pub fn new(peer_endpoints: Vec<SocketAddr>) -> Self {
         Server {
             id: Uuid::new_v4(),
             mode: Mutex::new(Box::new(FollowerMode::new())),
-            peers: vec![],
+            peers: peer_endpoints,
             last_heartbeat: None,
             election_timeout_mills: Duration::from_millis(rand::thread_rng().gen_range(150..=300)),
-        }
-    }
-
-    pub fn start(&mut self) {
-        println!("Server {} started...", self.id);
-        // start thread to check heartbeats
-        loop {
-            sleep(self.election_timeout_mills);
-            self.check_heatbeat();
-            yield_now();
         }
     }
 
@@ -112,10 +101,18 @@ impl Server {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Main function");
-    let addr = "[::1]:50051".parse()?;
+    let peer_endpoints: Result<Vec<SocketAddr>, _> = env::var("PEER_ENDPOINTS")?
+        .split(',')
+        .map(str::parse)
+        .collect();
+    let peer_addrs = peer_endpoints?;
+    println!("{:?}", peer_addrs);
+    let self_addr = env::var("SELF_ENDPOINT")?.parse()?;
+    println!("{:?}", self_addr);
     transport::Server::builder()
-        .add_service(RaftServer::new(Server::new()))
-        .serve(addr)
+        .add_service(RaftServer::new(Server::new(peer_addrs)))
+        .serve(self_addr)
         .await?;
+    println!("After server");
     Ok(())
 }
